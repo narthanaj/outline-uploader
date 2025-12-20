@@ -1,5 +1,8 @@
 name: 'Outline Security Reporter'
 description: 'Parses security scan reports and uploads them to Outline'
+branding:
+  icon: 'lock'
+  color: 'purple'
 inputs:
   api-key:
     description: 'Outline API Key'
