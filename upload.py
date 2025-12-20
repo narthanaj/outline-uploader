@@ -115,6 +115,11 @@ def main():
     all_findings = []
     
     patterns = args.report_files.split(',')
+    
+    # Clean input
+    collection_id = args.collection_id.strip()
+    print(f"DEBUG: Collection ID length: {len(collection_id)}")
+
     for pattern in patterns:
         for file_path in glob.glob(pattern.strip()):
             print(f"Processing {file_path}...")
@@ -135,7 +140,7 @@ def main():
     import datetime
     title = f"Security Scan Report - {datetime.datetime.now().strftime('%Y-%m-%d %H:%M')}"
     
-    upload_to_outline(args.api_key, args.base_url, args.collection_id, title, markdown_content)
+    upload_to_outline(args.api_key, args.base_url, collection_id, title, markdown_content)
 
 if __name__ == "__main__":
     main()

@@ -43,11 +43,10 @@ runs:
       run: |
         mkdir -p security-reports
         echo "🚀 Running Checkov..."
-        # Soft fail enabled to always proceed to upload
+        # Use redirection to avoid Checkov creating a directory for multi-framework outputs
         checkov -d infrastructure/ \
             --output json \
-            --output-file security-reports/checkov_report.json \
-            --soft-fail || true
+            --soft-fail > security-reports/checkov_report.json || true
 
     - name: Run Trivy
       shell: bash
