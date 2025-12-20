@@ -83,13 +83,14 @@ def get_severity_weight(severity):
 
 def current_localized_timestamp(format_string='%Y-%m-%d %H:%M %Z'):
     """
-    Return the current time converted from UTC into the local timezone,
-    formatted using the provided strftime pattern.
+    Return the current local time as a timezone-aware string formatted
+    using the provided strftime pattern.
     """
-    return datetime.datetime.now(datetime.timezone.utc).astimezone().strftime(format_string)
+    localized_now = datetime.datetime.now().astimezone()
+    return localized_now.strftime(format_string)
 
 def generate_markdown(findings, job_url):
-    now_str = current_localized_timestamp()
+    timestamp_str = current_localized_timestamp()
     total_issues = len(findings)
     
     findings.sort(key=lambda x: get_severity_weight(x['severity']))
@@ -100,7 +101,7 @@ def generate_markdown(findings, job_url):
         severity_counts[sev] = severity_counts.get(sev, 0) + 1
 
     md = f"# 🛡️ Security Scan Report\n\n"
-    md += f"**Timestamp**: {now_str}  \n"
+    md += f"**Timestamp**: {timestamp_str}  \n"
     if job_url:
         md += f"**Source Job**: [View in GitHub]({job_url})\n\n"
     
