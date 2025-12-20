@@ -1,0 +1,48 @@
+name: 'Outline Security Reporter'
+description: 'Parses security scan reports and uploads them to Outline'
+inputs:
+  api-key:
+    description: 'Outline API Key'
+    required: true
+  base-url:
+    description: 'Outline Base URL'
+    required: true
+  collection-id:
+    description: 'Outline Collection ID'
+    required: true
+  report-files:
+    description: 'Comma separated list of report files pattern'
+    required: true
+  job-url:
+    description: 'URL of the CI job'
+    required: false
+
+runs:
+  using: "composite"
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.x'
+
+    - name: Install dependencies
+      shell: bash
+      run: |
+        python -m pip install --upgrade pip
+        pip install requests
+
+    - name: Run upload script
+      shell: bash
+      env:
+        OUTLINE_API_KEY: ${{ inputs.api-key }}
+        OUTLINE_BASE_URL: ${{ inputs.base-url }}
+        OUTLINE_COLLECTION_ID: ${{ inputs.collection-id }}
+        REPORT_FILES: ${{ inputs.report-files }}
+        JOB_URL: ${{ inputs.job-url }}
+      run: |
+        python ${{ github.action_path }}/upload.py \
+          --api-key "$OUTLINE_API_KEY" \
+          --base-url "$OUTLINE_BASE_URL" \
+          --collection-id "$OUTLINE_COLLECTION_ID" \
+          --report-files "$REPORT_FILES" \
+          --job-url "$JOB_URL"
