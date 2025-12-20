@@ -82,7 +82,8 @@ def get_severity_weight(severity):
     return weights.get(severity.upper(), 10)
 
 def generate_markdown(findings, job_url):
-    now = datetime.datetime.now().strftime('%Y-%m-%d %H:%M UTC')
+    now = datetime.datetime.now(datetime.timezone.utc).astimezone()
+    now_str = now.strftime('%Y-%m-%d %H:%M %Z')
     total_issues = len(findings)
     
     findings.sort(key=lambda x: get_severity_weight(x['severity']))
@@ -93,7 +94,7 @@ def generate_markdown(findings, job_url):
         severity_counts[sev] = severity_counts.get(sev, 0) + 1
 
     md = f"# 🛡️ Security Scan Report\n\n"
-    md += f"**Timestamp**: {now}  \n"
+    md += f"**Timestamp**: {now_str}  \n"
     if job_url:
         md += f"**Source Job**: [View in GitHub]({job_url})\n\n"
     
@@ -237,7 +238,8 @@ def main():
         except Exception as e:
             print(f"Failed to resolve path: {e}. Falling back to root.")
 
-    title = f"Scan: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M')}"
+    report_time = datetime.datetime.now(datetime.timezone.utc).astimezone()
+    title = f"Scan: {report_time.strftime('%Y-%m-%d %H:%M %Z')}"
     
     print(f"Uploading report '{title}'...")
     create_document(args.api_key, args.base_url, collection_id, title, parent_doc_id, markdown_content)
