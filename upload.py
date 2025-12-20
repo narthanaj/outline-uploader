@@ -81,8 +81,12 @@ def get_severity_weight(severity):
     weights = {'CRITICAL': 0, 'HIGH': 1, 'MEDIUM': 2, 'LOW': 3, 'UNKNOWN': 4}
     return weights.get(severity.upper(), 10)
 
-def current_localized_timestamp():
-    return datetime.datetime.now(datetime.timezone.utc).astimezone().strftime('%Y-%m-%d %H:%M %Z')
+def current_localized_timestamp(format_string='%Y-%m-%d %H:%M %Z'):
+    """
+    Return the current time converted from UTC into the local timezone,
+    formatted using the provided strftime pattern.
+    """
+    return datetime.datetime.now(datetime.timezone.utc).astimezone().strftime(format_string)
 
 def generate_markdown(findings, job_url):
     now_str = current_localized_timestamp()
@@ -240,7 +244,7 @@ def main():
         except Exception as e:
             print(f"Failed to resolve path: {e}. Falling back to root.")
 
-    title = f"Scan: {current_localized_timestamp()}"
+    title = f"Scan: {current_localized_timestamp('%Y-%m-%d %H:%M')}"
     
     print(f"Uploading report '{title}'...")
     create_document(args.api_key, args.base_url, collection_id, title, parent_doc_id, markdown_content)
