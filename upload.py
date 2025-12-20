@@ -3,6 +3,7 @@ import json
 import argparse
 import requests
 import glob
+import datetime
 
 def parse_checkov(file_path):
     if not os.path.exists(file_path):
@@ -11,9 +12,11 @@ def parse_checkov(file_path):
     findings = []
     try:
         with open(file_path, 'r') as f:
-            data = json.load(f)
+            content = f.read()
+            if not content.strip():
+                return []
+            data = json.loads(content)
             
-        # Checkov output can be a list (multiple checks) or dict
         if isinstance(data, dict):
             data = [data]
             
@@ -22,11 +25,11 @@ def parse_checkov(file_path):
                 for check in result['results']['failed_checks']:
                     findings.append({
                         'tool': 'Checkov',
-                        'severity': 'HIGH', # Checkov usually just passes/fails
+                        'severity': 'HIGH',
                         'id': check.get('check_id'),
                         'description': check.get('check_name'),
                         'resource': check.get('resource'),
-                        'file': check.get('file_path')
+                        'file': check.get('file_path'),
                     })
     except Exception as e:
         print(f"Error parsing Checkov file {file_path}: {e}")
@@ -40,7 +43,10 @@ def parse_trivy(file_path):
     findings = []
     try:
         with open(file_path, 'r') as f:
-            data = json.load(f)
+            content = f.read()
+            if not content.strip():
+                return []
+            data = json.loads(content)
             
         if 'Results' in data:
             for result in data['Results']:
@@ -53,73 +59,165 @@ def parse_trivy(file_path):
                             'id': vuln.get('VulnerabilityID'),
                             'description': vuln.get('Title', 'No description'),
                             'resource': vuln.get('PkgName'),
-                            'file': target
+                            'file': target,
+                            'fixed_version': vuln.get('FixedVersion', 'N/A')
+                        })
+                if 'Misconfigurations' in result:
+                     for misconf in result['Misconfigurations']:
+                        findings.append({
+                            'tool': 'Trivy (Misconfig)',
+                            'severity': misconf.get('Severity', 'UNKNOWN'),
+                            'id': misconf.get('ID'),
+                            'description': misconf.get('Title', 'No description'),
+                            'resource': misconf.get('Title'),
+                            'file': target,
                         })
     except Exception as e:
         print(f"Error parsing Trivy file {file_path}: {e}")
         
     return findings
 
-def generate_markdown(findings):
-    if not findings:
-        return "## Security Scan Results\n\n✅ No security issues found!"
-        
-    md = "## Security Scan Results\n\n"
-    md += f"Found {len(findings)} issues.\n\n"
+def get_severity_weight(severity):
+    weights = {'CRITICAL': 0, 'HIGH': 1, 'MEDIUM': 2, 'LOW': 3, 'UNKNOWN': 4}
+    return weights.get(severity.upper(), 10)
+
+def generate_markdown(findings, job_url):
+    now = datetime.datetime.now().strftime('%Y-%m-%d %H:%M UTC')
+    total_issues = len(findings)
     
-    md += "| Tool | Severity | ID | Resource | Description | File |\n"
-    md += "|---|---|---|---|---|---|\n"
+    findings.sort(key=lambda x: get_severity_weight(x['severity']))
+    
+    severity_counts = {}
+    for f in findings:
+        sev = f['severity'].upper()
+        severity_counts[sev] = severity_counts.get(sev, 0) + 1
+
+    md = f"# 🛡️ Security Scan Report\n\n"
+    md += f"**Timestamp**: {now}  \n"
+    if job_url:
+        md += f"**Source Job**: [View in GitHub]({job_url})\n\n"
+    
+    md += "## 📊 Executive Summary\n\n"
+    
+    if total_issues == 0:
+        md += "✅ **No security issues found!** Your code looks clean.\n\n"
+        return md
+
+    md += f"Found **{total_issues}** potential issues.\n\n"
+    
+    md += "| Critical 🔴 | High 🟠 | Medium 🟡 | Low 🔵 |\n"
+    md += "|:---:|:---:|:---:|:---:|\n"
+    md += f"| {severity_counts.get('CRITICAL', 0)} | {severity_counts.get('HIGH', 0)} | {severity_counts.get('MEDIUM', 0)} | {severity_counts.get('LOW', 0)} |\n\n"
+
+    md += "## 🔍 Detailed Findings\n\n"
+    
+    current_sev = None
     
     for f in findings:
-        # Sanitize pipes in description
-        desc = f['description'].replace('|', ' ') if f['description'] else ''
-        md += f"| {f['tool']} | {f['severity']} | {f['id']} | {f['resource']} | {desc} | {f['file']} |\n"
+        sev = f['severity'].upper()
+        if sev != current_sev:
+            current_sev = sev
+            icon = {'CRITICAL': '🔴', 'HIGH': '🟠', 'MEDIUM': '🟡', 'LOW': '🔵'}.get(sev, '⚪')
+            md += f"### {icon} {sev} Priority\n\n"
         
+        desc = f['description'].replace('|', ' ') if f['description'] else 'No Description'
+        resource = f['resource'] if f.get('resource') else 'N/A'
+        
+        md += f"<details>\n<summary><b>[{f['tool']}] {f['id']}</b>: {desc[:80]}...</summary>\n\n"
+        md += f"- **Resource**: `{resource}`\n"
+        md += f"- **File**: `{f['file']}`\n"
+        if f.get('fixed_version') and f['fixed_version'] != 'N/A':
+             md += f"- **Fixed Version**: `{f['fixed_version']}`\n"
+        
+        md += f"\n> {desc}\n\n"
+        md += "</details>\n\n"
+
+    md += "---\n*Report generated by Outline Uploader Action*"
     return md
 
-def upload_to_outline(api_key, base_url, collection_id, title, content):
-    url = f"{base_url.rstrip('/')}/api/documents.create"
-    
-    headers = {
+def headers(api_key):
+    return {
         "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json",
         "Accept": "application/json"
     }
-    
+
+def find_document(api_key, base_url, collection_id, title, parent_id=None):
+    url = f"{base_url.rstrip('/')}/api/documents.search"
     payload = {
         "collectionId": collection_id,
-        "title": title,
-        "text": content,
-        "publish": True
+        "query": title,
+        "includeArchived": False,
+        "limit": 10
     }
     
     try:
-        response = requests.post(url, headers=headers, json=payload)
+        response = requests.post(url, headers=headers(api_key), json=payload)
         response.raise_for_status()
-        print(f"Successfully uploaded to Outline: {response.json().get('data', {}).get('url')}")
-    except requests.exceptions.HTTPError as e:
-        print(f"Failed to upload to Outline: {e}")
-        print(f"Response: {response.text}")
-        exit(1)
+        results = response.json().get('data', [])
+        for doc in results:
+            if doc['document']['title'].lower() == title.lower():
+                if parent_id:
+                     if doc['document'].get('parentDocumentId') == parent_id:
+                         return doc['document']['id']
+                elif doc['document'].get('parentDocumentId') is None:
+                     return doc['document']['id']
+    except Exception as e:
+        print(f"Warning: Could not search for document '{title}': {e}")
+    return None
+
+def create_document(api_key, base_url, collection_id, title, parent_id=None, text=""):
+    url = f"{base_url.rstrip('/')}/api/documents.create"
+    payload = {
+        "collectionId": collection_id,
+        "title": title,
+        "text": text,
+        "publish": True
+    }
+    if parent_id:
+        payload["parentDocumentId"] = parent_id
+    
+    response = requests.post(url, headers=headers(api_key), json=payload)
+    if response.status_code == 200:
+        return response.json()['data']['id']
+    else:
+        raise Exception(f"Failed to create document '{title}': {response.text}")
+
+def ensure_path(api_key, base_url, collection_id, path):
+    if not path:
+        return None
+        
+    parts = [p.strip() for p in path.split('/') if p.strip()]
+    current_parent_id = None
+    
+    for part in parts:
+        doc_id = find_document(api_key, base_url, collection_id, part, current_parent_id)
+        
+        if not doc_id:
+            print(f"Creating folder document: {part}")
+            doc_id = create_document(api_key, base_url, collection_id, part, current_parent_id, text=f"# {part}\n\nFolder for reports.")
+        else:
+            print(f"Found existing folder: {part}")
+            
+        current_parent_id = doc_id
+        
+    return current_parent_id
 
 def main():
     parser = argparse.ArgumentParser(description='Upload security reports to Outline')
-    parser.add_argument('--api-key', required=True, help='Outline API Key')
-    parser.add_argument('--base-url', required=True, help='Outline Base URL')
-    parser.add_argument('--collection-id', required=True, help='Outline Collection ID')
-    parser.add_argument('--report-files', required=True, help='Comma separated list of report files pattern')
-    parser.add_argument('--job-url', required=False, help='URL of the CI job')
+    parser.add_argument('--api-key', required=True)
+    parser.add_argument('--base-url', required=True)
+    parser.add_argument('--collection-id', required=True)
+    parser.add_argument('--report-files', required=True)
+    parser.add_argument('--job-url', required=False)
+    parser.add_argument('--publish-path', required=False, default='', help="Path like 'Reports/CI/K8s'")
     
     args = parser.parse_args()
     
     all_findings = []
-    
     patterns = args.report_files.split(',')
-    
-    # Clean input
     collection_id = args.collection_id.strip()
-    print(f"DEBUG: Collection ID length: {len(collection_id)}")
-
+    
     for pattern in patterns:
         for file_path in glob.glob(pattern.strip()):
             print(f"Processing {file_path}...")
@@ -127,20 +225,23 @@ def main():
                 all_findings.extend(parse_checkov(file_path))
             elif 'trivy' in file_path.lower():
                 all_findings.extend(parse_trivy(file_path))
-            else:
-                print(f"Unknown report type for {file_path}, attempting generic parse...")
-                # Fallback or strict? Let's just try checkov format as default or skip
-                pass
 
-    markdown_content = generate_markdown(all_findings)
+    markdown_content = generate_markdown(all_findings, args.job_url)
     
-    if args.job_url:
-        markdown_content = f"**Source Job**: {args.job_url}\n\n" + markdown_content
-        
-    import datetime
-    title = f"Security Scan Report - {datetime.datetime.now().strftime('%Y-%m-%d %H:%M')}"
+    parent_doc_id = None
+    if args.publish_path:
+        print(f"Ensuring path structure: {args.publish_path}")
+        try:
+            parent_doc_id = ensure_path(args.api_key, args.base_url, collection_id, args.publish_path)
+            print(f"Resolved parent document ID: {parent_doc_id}")
+        except Exception as e:
+            print(f"Failed to resolve path: {e}. Falling back to root.")
+
+    title = f"Scan: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M')}"
     
-    upload_to_outline(args.api_key, args.base_url, collection_id, title, markdown_content)
+    print(f"Uploading report '{title}'...")
+    create_document(args.api_key, args.base_url, collection_id, title, parent_doc_id, markdown_content)
+    print("✅ Upload complete.")
 
 if __name__ == "__main__":
     main()
