@@ -87,10 +87,10 @@ def get_severity_weight(severity):
 
 def current_localized_timestamp(format_string=REPORT_TIMESTAMP_FORMAT):
     """
-    Return the current time in the local timezone as a timezone-aware
-    string formatted using the provided strftime pattern.
+    Return the current time formatted as a string in the local timezone
+    using the provided strftime pattern.
     """
-    localized_now = datetime.datetime.now().astimezone()
+    localized_now = datetime.datetime.now(tz=datetime.timezone.utc).astimezone()
     return localized_now.strftime(format_string)
 
 def generate_markdown(findings, job_url):
