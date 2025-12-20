@@ -6,7 +6,6 @@ import glob
 import datetime
 
 TIMESTAMP_FORMAT = '%Y-%m-%d %H:%M %z'
-TITLE_TIMESTAMP_FORMAT = TIMESTAMP_FORMAT
 
 def parse_checkov(file_path):
     if not os.path.exists(file_path):
@@ -86,7 +85,7 @@ def get_severity_weight(severity):
 
 def current_localized_timestamp(format_string=TIMESTAMP_FORMAT):
     """
-    Return the current local time (converted from UTC) as a timezone-aware
+    Return the current time in the local timezone as a timezone-aware
     string formatted using the provided strftime pattern.
     """
     localized_now = datetime.datetime.now(datetime.timezone.utc).astimezone()
@@ -248,7 +247,7 @@ def main():
         except Exception as e:
             print(f"Failed to resolve path: {e}. Falling back to root.")
 
-    title = f"Scan: {current_localized_timestamp(TITLE_TIMESTAMP_FORMAT)}"
+    title = f"Scan: {current_localized_timestamp(TIMESTAMP_FORMAT)}"
     
     print(f"Uploading report '{title}'...")
     create_document(args.api_key, args.base_url, collection_id, title, parent_doc_id, markdown_content)
