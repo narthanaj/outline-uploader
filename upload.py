@@ -6,7 +6,7 @@ import glob
 import datetime
 
 TIMESTAMP_FORMAT = '%Y-%m-%d %H:%M %z'
-TITLE_TIMESTAMP_FORMAT = '%Y-%m-%d %H:%M'
+TITLE_TIMESTAMP_FORMAT = TIMESTAMP_FORMAT
 
 def parse_checkov(file_path):
     if not os.path.exists(file_path):
@@ -86,10 +86,10 @@ def get_severity_weight(severity):
 
 def current_localized_timestamp(format_string=TIMESTAMP_FORMAT):
     """
-    Return the current local time as a timezone-aware string formatted
-    using the provided strftime pattern.
+    Return the current local time (converted from UTC) as a timezone-aware
+    string formatted using the provided strftime pattern.
     """
-    localized_now = datetime.datetime.now().astimezone()
+    localized_now = datetime.datetime.now(datetime.timezone.utc).astimezone()
     return localized_now.strftime(format_string)
 
 def generate_markdown(findings, job_url):
