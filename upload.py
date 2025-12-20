@@ -6,7 +6,7 @@ import glob
 import datetime
 
 REPORT_TIMESTAMP_FORMAT = '%Y-%m-%d %H:%M %z'
-# Title format omits timezone offset to avoid special characters in document names
+# Titles omit timezone offsets (e.g., +HHMM) to avoid special characters in document names
 TITLE_TIMESTAMP_FORMAT = '%Y-%m-%d %H:%M'
 
 def parse_checkov(file_path):
@@ -85,7 +85,7 @@ def get_severity_weight(severity):
     weights = {'CRITICAL': 0, 'HIGH': 1, 'MEDIUM': 2, 'LOW': 3, 'UNKNOWN': 4}
     return weights.get(severity.upper(), 10)
 
-def current_localized_timestamp(format_string=REPORT_TIMESTAMP_FORMAT):
+def localized_timestamp(format_string=REPORT_TIMESTAMP_FORMAT):
     """
     Return the current time formatted as a string in the local timezone
     using the provided strftime pattern.
@@ -94,7 +94,7 @@ def current_localized_timestamp(format_string=REPORT_TIMESTAMP_FORMAT):
     return localized_now.strftime(format_string)
 
 def generate_markdown(findings, job_url):
-    timestamp_str = current_localized_timestamp()
+    timestamp_str = localized_timestamp()
     total_issues = len(findings)
     
     findings.sort(key=lambda x: get_severity_weight(x['severity']))
@@ -249,7 +249,7 @@ def main():
         except Exception as e:
             print(f"Failed to resolve path: {e}. Falling back to root.")
 
-    title = f"Scan: {current_localized_timestamp(TITLE_TIMESTAMP_FORMAT)}"
+    title = f"Scan: {localized_timestamp(TITLE_TIMESTAMP_FORMAT)}"
     
     print(f"Uploading report '{title}'...")
     create_document(args.api_key, args.base_url, collection_id, title, parent_doc_id, markdown_content)
