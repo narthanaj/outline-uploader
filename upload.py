@@ -5,6 +5,7 @@ import requests
 import glob
 import datetime
 
+# Default report timestamps include timezone offset for clarity
 REPORT_TIMESTAMP_FORMAT = '%Y-%m-%d %H:%M %z'
 # Titles omit timezone offsets (e.g., +HHMM) to avoid special characters in document names
 TITLE_TIMESTAMP_FORMAT = '%Y-%m-%d %H:%M'
@@ -90,7 +91,7 @@ def localized_timestamp(format_string=REPORT_TIMESTAMP_FORMAT):
     Return the current time formatted as a string in the local timezone
     using the provided strftime pattern.
     """
-    localized_now = datetime.datetime.now(tz=datetime.timezone.utc).astimezone()
+    localized_now = datetime.datetime.now().astimezone()
     return localized_now.strftime(format_string)
 
 def generate_markdown(findings, job_url):
