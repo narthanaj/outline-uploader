@@ -88,8 +88,10 @@ def get_severity_weight(severity):
 
 def localized_timestamp(format_string=REPORT_TIMESTAMP_FORMAT):
     """
-    Return the current time formatted as a string in the local timezone
-    using the provided strftime pattern.
+    Return the current time formatted as a string in the local timezone.
+    A UTC timestamp is converted to the local zone to ensure offset data
+    is present even if the host timezone is not fully configured. The
+    default format includes the +HHMM offset unless overridden.
     """
     localized_now = datetime.datetime.now(datetime.timezone.utc).astimezone()
     return localized_now.strftime(format_string)
