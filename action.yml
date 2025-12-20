@@ -29,7 +29,36 @@ runs:
       shell: bash
       run: |
         python -m pip install --upgrade pip
-        pip install requests
+        pip install requests checkov
+
+    - name: Install Trivy
+      shell: bash
+      run: |
+        if ! command -v trivy &> /dev/null; then
+            curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
+        fi
+
+    - name: Run Checkov
+      shell: bash
+      run: |
+        mkdir -p security-reports
+        echo "🚀 Running Checkov..."
+        # Soft fail enabled to always proceed to upload
+        checkov -d infrastructure/ \
+            --output json \
+            --output-file security-reports/checkov_report.json \
+            --soft-fail || true
+
+    - name: Run Trivy
+      shell: bash
+      run: |
+        echo "🚀 Running Trivy..."
+        trivy fs . \
+            --format json \
+            --output security-reports/trivy_report.json \
+            --exit-code 0 \
+            --scanners vuln,config,secret \
+            --ignore-unfixed || true
 
     - name: Run upload script
       shell: bash
