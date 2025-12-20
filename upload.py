@@ -5,6 +5,11 @@ import requests
 import glob
 import datetime
 
+# Default report timestamps include timezone offset for clarity
+REPORT_TIMESTAMP_FORMAT = '%Y-%m-%d %H:%M %z'
+# Titles omit timezone offsets (e.g., +HHMM) to avoid special characters in document names
+TITLE_TIMESTAMP_FORMAT = '%Y-%m-%d %H:%M'
+
 def parse_checkov(file_path):
     if not os.path.exists(file_path):
         return []
@@ -81,8 +86,18 @@ def get_severity_weight(severity):
     weights = {'CRITICAL': 0, 'HIGH': 1, 'MEDIUM': 2, 'LOW': 3, 'UNKNOWN': 4}
     return weights.get(severity.upper(), 10)
 
+def localized_timestamp(format_string=REPORT_TIMESTAMP_FORMAT):
+    """
+    Return the current time formatted as a string in the local timezone.
+    A UTC timestamp is converted to the local zone to ensure offset data
+    is present even if the host timezone is not fully configured. The
+    default format includes the +HHMM offset unless overridden.
+    """
+    localized_now = datetime.datetime.now(datetime.timezone.utc).astimezone()
+    return localized_now.strftime(format_string)
+
 def generate_markdown(findings, job_url):
-    now = datetime.datetime.now().strftime('%Y-%m-%d %H:%M UTC')
+    timestamp_str = localized_timestamp()
     total_issues = len(findings)
     
     findings.sort(key=lambda x: get_severity_weight(x['severity']))
@@ -93,7 +108,7 @@ def generate_markdown(findings, job_url):
         severity_counts[sev] = severity_counts.get(sev, 0) + 1
 
     md = f"# 🛡️ Security Scan Report\n\n"
-    md += f"**Timestamp**: {now}  \n"
+    md += f"**Timestamp**: {timestamp_str}  \n"
     if job_url:
         md += f"**Source Job**: [View in GitHub]({job_url})\n\n"
     
@@ -237,7 +252,7 @@ def main():
         except Exception as e:
             print(f"Failed to resolve path: {e}. Falling back to root.")
 
-    title = f"Scan: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M')}"
+    title = f"Scan: {localized_timestamp(TITLE_TIMESTAMP_FORMAT)}"
     
     print(f"Uploading report '{title}'...")
     create_document(args.api_key, args.base_url, collection_id, title, parent_doc_id, markdown_content)
