@@ -91,7 +91,7 @@ def localized_timestamp(format_string=REPORT_TIMESTAMP_FORMAT):
     Return the current time formatted as a string in the local timezone
     using the provided strftime pattern.
     """
-    localized_now = datetime.datetime.now().astimezone()
+    localized_now = datetime.datetime.now(datetime.timezone.utc).astimezone()
     return localized_now.strftime(format_string)
 
 def generate_markdown(findings, job_url):
