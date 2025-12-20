@@ -13,9 +13,10 @@ inputs:
   report-files:
     description: 'Comma separated list of report files pattern'
     required: true
-  job-url:
-    description: 'URL of the CI job'
+  publish-path:
+    description: 'Path structure for the report (e.g. Reports/CI)'
     required: false
+    default: ''
 
 runs:
   using: "composite"
@@ -67,10 +68,12 @@ runs:
         OUTLINE_COLLECTION_ID: ${{ inputs.collection-id }}
         REPORT_FILES: ${{ inputs.report-files }}
         JOB_URL: ${{ inputs.job-url }}
+        PUBLISH_PATH: ${{ inputs.publish-path }}
       run: |
         python ${{ github.action_path }}/upload.py \
           --api-key "$OUTLINE_API_KEY" \
           --base-url "$OUTLINE_BASE_URL" \
           --collection-id "$OUTLINE_COLLECTION_ID" \
           --report-files "$REPORT_FILES" \
-          --job-url "$JOB_URL"
+          --job-url "$JOB_URL" \
+          --publish-path "$PUBLISH_PATH"
