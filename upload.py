@@ -5,7 +5,9 @@ import requests
 import glob
 import datetime
 
-TIMESTAMP_FORMAT = '%Y-%m-%d %H:%M %z'
+REPORT_TIMESTAMP_FORMAT = '%Y-%m-%d %H:%M %z'
+# Title format omits timezone offset to avoid special characters in document names
+TITLE_TIMESTAMP_FORMAT = '%Y-%m-%d %H:%M'
 
 def parse_checkov(file_path):
     if not os.path.exists(file_path):
@@ -83,12 +85,12 @@ def get_severity_weight(severity):
     weights = {'CRITICAL': 0, 'HIGH': 1, 'MEDIUM': 2, 'LOW': 3, 'UNKNOWN': 4}
     return weights.get(severity.upper(), 10)
 
-def current_localized_timestamp(format_string=TIMESTAMP_FORMAT):
+def current_localized_timestamp(format_string=REPORT_TIMESTAMP_FORMAT):
     """
     Return the current time in the local timezone as a timezone-aware
     string formatted using the provided strftime pattern.
     """
-    localized_now = datetime.datetime.now(datetime.timezone.utc).astimezone()
+    localized_now = datetime.datetime.now().astimezone()
     return localized_now.strftime(format_string)
 
 def generate_markdown(findings, job_url):
@@ -247,7 +249,7 @@ def main():
         except Exception as e:
             print(f"Failed to resolve path: {e}. Falling back to root.")
 
-    title = f"Scan: {current_localized_timestamp(TIMESTAMP_FORMAT)}"
+    title = f"Scan: {current_localized_timestamp(TITLE_TIMESTAMP_FORMAT)}"
     
     print(f"Uploading report '{title}'...")
     create_document(args.api_key, args.base_url, collection_id, title, parent_doc_id, markdown_content)
