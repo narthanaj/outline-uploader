@@ -20,6 +20,10 @@ inputs:
     description: 'Path structure for the report (e.g. Reports/CI)'
     required: false
     default: ''
+  project-name:
+    description: 'Project name displayed in report header'
+    required: false
+    default: ''
 
 runs:
   using: "composite"
@@ -79,10 +83,12 @@ runs:
         REPORT_FILES: ${{ inputs.report-files }}
         JOB_URL: ${{ inputs.job-url }}
         PUBLISH_PATH: ${{ inputs.publish-path }}
+        PROJECT_NAME: ${{ inputs.project-name }}
       run: |
         python ${{ github.action_path }}/upload.py \
           --base-url "$OUTLINE_BASE_URL" \
           --collection-id "$OUTLINE_COLLECTION_ID" \
           --report-files "$REPORT_FILES" \
           --job-url "$JOB_URL" \
-          --publish-path "$PUBLISH_PATH"
+          --publish-path "$PUBLISH_PATH" \
+          --project-name "$PROJECT_NAME"

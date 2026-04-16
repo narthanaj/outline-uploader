@@ -96,18 +96,20 @@ def localized_timestamp(format_string=REPORT_TIMESTAMP_FORMAT):
     localized_now = datetime.datetime.now(datetime.timezone.utc).astimezone()
     return localized_now.strftime(format_string)
 
-def generate_markdown(findings, job_url):
+def generate_markdown(findings, job_url, project_name=None):
     timestamp_str = localized_timestamp()
     total_issues = len(findings)
-    
+
     findings.sort(key=lambda x: get_severity_weight(x['severity']))
-    
+
     severity_counts = {}
     for f in findings:
         sev = f['severity'].upper()
         severity_counts[sev] = severity_counts.get(sev, 0) + 1
 
     md = f"# 🛡️ Security Scan Report\n\n"
+    if project_name:
+        md += f"**Project**: {project_name}  \n"
     md += f"**Timestamp**: {timestamp_str}  \n"
     if job_url:
         md += f"**Source Job**: [View in GitHub]({job_url})\n\n"
@@ -225,7 +227,8 @@ def main():
     parser.add_argument('--report-files', required=True)
     parser.add_argument('--job-url', required=False)
     parser.add_argument('--publish-path', required=False, default='', help="Path like 'Reports/CI/K8s'")
-    
+    parser.add_argument('--project-name', required=False, default='', help="Project name for report header")
+
     args = parser.parse_args()
 
     api_key = os.environ.get('OUTLINE_API_KEY')
@@ -244,7 +247,7 @@ def main():
             elif 'trivy' in file_path.lower():
                 all_findings.extend(parse_trivy(file_path))
 
-    markdown_content = generate_markdown(all_findings, args.job_url)
+    markdown_content = generate_markdown(all_findings, args.job_url, args.project_name or None)
     
     parent_doc_id = None
     if args.publish_path:
