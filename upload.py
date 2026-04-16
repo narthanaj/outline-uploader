@@ -220,7 +220,6 @@ def ensure_path(api_key, base_url, collection_id, path):
 
 def main():
     parser = argparse.ArgumentParser(description='Upload security reports to Outline')
-    parser.add_argument('--api-key', required=True)
     parser.add_argument('--base-url', required=True)
     parser.add_argument('--collection-id', required=True)
     parser.add_argument('--report-files', required=True)
@@ -228,7 +227,11 @@ def main():
     parser.add_argument('--publish-path', required=False, default='', help="Path like 'Reports/CI/K8s'")
     
     args = parser.parse_args()
-    
+
+    api_key = os.environ.get('OUTLINE_API_KEY')
+    if not api_key:
+        raise SystemExit("OUTLINE_API_KEY environment variable is required")
+
     all_findings = []
     patterns = args.report_files.split(',')
     collection_id = args.collection_id.strip()
@@ -247,7 +250,7 @@ def main():
     if args.publish_path:
         print(f"Ensuring path structure: {args.publish_path}")
         try:
-            parent_doc_id = ensure_path(args.api_key, args.base_url, collection_id, args.publish_path)
+            parent_doc_id = ensure_path(api_key, args.base_url, collection_id, args.publish_path)
             print(f"Resolved parent document ID: {parent_doc_id}")
         except Exception as e:
             print(f"Failed to resolve path: {e}. Falling back to root.")
@@ -255,7 +258,7 @@ def main():
     title = f"Scan: {localized_timestamp(TITLE_TIMESTAMP_FORMAT)}"
     
     print(f"Uploading report '{title}'...")
-    create_document(args.api_key, args.base_url, collection_id, title, parent_doc_id, markdown_content)
+    create_document(api_key, args.base_url, collection_id, title, parent_doc_id, markdown_content)
     print("✅ Upload complete.")
 
 if __name__ == "__main__":

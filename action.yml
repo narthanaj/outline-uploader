@@ -33,13 +33,20 @@ runs:
       shell: bash
       run: |
         python -m pip install --upgrade pip
-        pip install requests checkov
+        pip install --require-hashes -r ${{ github.action_path }}/requirements.txt
 
     - name: Install Trivy
       shell: bash
+      env:
+        TRIVY_VERSION: "0.69.3"
+        TRIVY_CHECKSUM: "1816b632dfe529869c740c0913e36bd1629cb7688bd5634f4a858c1d57c88b75"
       run: |
         if ! command -v trivy &> /dev/null; then
-            curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
+            curl -sfL -o /tmp/trivy.tar.gz \
+              "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz"
+            echo "${TRIVY_CHECKSUM}  /tmp/trivy.tar.gz" | sha256sum -c -
+            tar -xzf /tmp/trivy.tar.gz -C /usr/local/bin trivy
+            rm /tmp/trivy.tar.gz
         fi
 
     - name: Run Checkov
@@ -74,7 +81,6 @@ runs:
         PUBLISH_PATH: ${{ inputs.publish-path }}
       run: |
         python ${{ github.action_path }}/upload.py \
-          --api-key "$OUTLINE_API_KEY" \
           --base-url "$OUTLINE_BASE_URL" \
           --collection-id "$OUTLINE_COLLECTION_ID" \
           --report-files "$REPORT_FILES" \
