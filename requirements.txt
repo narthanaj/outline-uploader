@@ -1,4 +1,2 @@
-# Pinned dependencies with integrity hashes (supply chain hardening)
-# Regenerate hashes: pip download <pkg>==<ver> --no-deps -d /tmp && pip hash /tmp/<wheel>
-requests==2.32.3 --hash=sha256:70761cfe03c773ceb22aa2f671b4757976145175cdfca038c02654d061d6dcc6
-checkov==3.2.361 --hash=sha256:2113d48e38ef5d0358102705336ed712f24638a0b4f67cd97040fc015556c35b
+requests==2.32.3
+checkov==3.2.361

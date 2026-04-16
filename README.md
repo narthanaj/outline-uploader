@@ -18,7 +18,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Security Scan & Upload
-        uses: narthanaj/outline-uploader@1.1.0
+        uses: narthanaj/outline-uploader@1.1.1
         with:
           api-key: ${{ secrets.OUTLINE_API_KEY }}
           base-url: ${{ secrets.OUTLINE_BASE_URL }}
@@ -28,7 +28,7 @@ jobs:
           job-url: "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
 ```
 
-> **Important**: Always pin to a release tag (e.g. `@1.1.0`), not `@main`.
+> **Important**: Always pin to a release tag (e.g. `@1.1.1`), not `@main`.
 
 ## Inputs
 
@@ -51,7 +51,7 @@ jobs:
 All external dependencies are integrity-verified:
 
 - **Trivy** is downloaded as a versioned release tarball and verified against a SHA-256 checksum before extraction.
-- **Python packages** (`requests`, `checkov`) are installed from a pinned `requirements.txt` using `pip install --require-hashes` to enforce hash verification.
+- **Python packages** (`requests`, `checkov`) are version-pinned in `requirements.txt` to prevent uncontrolled dependency updates.
 - The **API key** is read from an environment variable internally and is never passed as a CLI argument.
 
 ## Security Recommendations for Callers
