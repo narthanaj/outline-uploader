@@ -1,29 +1,65 @@
 name: 'Outline Security Reporter'
-description: 'Parses security scan reports and uploads them to Outline'
+description: 'Parses security scan reports and uploads them to Outline with per-app layout, UPDATE-or-CREATE latest, immutable history archive, and retention.'
 branding:
   icon: 'lock'
   color: 'purple'
+
 inputs:
+  # Outline connection
   api-key:
-    description: 'Outline API Key'
+    description: 'Outline API Key (must have create + update + archive on the target collection).'
     required: true
   base-url:
-    description: 'Outline Base URL'
+    description: 'Outline Base URL (https://...).'
     required: true
   collection-id:
-    description: 'Outline Collection ID'
+    description: 'UUID of the Outline collection to publish to.'
     required: true
   report-files:
-    description: 'Comma separated list of report files pattern'
+    description: 'Comma-separated glob patterns for report files (e.g. security-reports/*.json).'
     required: true
+
+  # New-layout mode (v1.2.0+). When `short-code` is non-empty the uploader writes to
+  # reports/ci/<short-code-lower>/<component>/latest and .../history/<date>-<sha7>,
+  # UPDATE-or-CREATEs `latest`, and applies retention to `history`. Use `_infra` as
+  # short-code for non-app scans (base-image-*, k8s-karpenter).
+  short-code:
+    description: 'App short code (e.g. NTH-AXT-FL-WA). Use _infra for non-app scans.'
+    required: false
+    default: ''
+  component:
+    description: "Sub-app component (matrix.component). 'app' for single-image apps."
+    required: false
+    default: 'app'
+  retention-count:
+    description: 'History docs to keep per (app, component) before archiving oldest. 0 = no prune.'
+    required: false
+    default: '100'
+
+  # Legacy mode (kept for backward compat — emits a deprecation warning). Will be
+  # removed in v2.0 once every consumer migrates to short-code + component.
   publish-path:
-    description: 'Path structure for the report (e.g. Reports/CI)'
+    description: 'DEPRECATED: legacy folder path. Use short-code + component instead.'
     required: false
     default: ''
+
+  # Cosmetic / metadata
   project-name:
-    description: 'Project name displayed in report header'
+    description: 'Project name displayed in the document body (e.g. FleetLink).'
     required: false
     default: ''
+  job-url:
+    description: 'URL of the originating GitHub Actions run (used as a back-link in the report).'
+    required: false
+    default: ''
+  commit-sha:
+    description: 'Commit SHA for history doc naming. Falls back to $GITHUB_SHA.'
+    required: false
+    default: ''
+  dry-run:
+    description: "Print resolved paths and exit without calling Outline. Useful for previews."
+    required: false
+    default: 'false'
 
 runs:
   using: "composite"
@@ -57,11 +93,14 @@ runs:
       shell: bash
       run: |
         mkdir -p security-reports
-        echo "🚀 Running Checkov..."
-        # Use redirection to avoid Checkov creating a directory for multi-framework outputs
-        checkov -d infrastructure/ \
-            --output json \
-            --soft-fail > security-reports/checkov_report.json || true
+        if command -v checkov &> /dev/null && [ -d infrastructure ]; then
+          echo "🚀 Running Checkov..."
+          checkov -d infrastructure/ \
+              --output json \
+              --soft-fail > security-reports/checkov_report.json || true
+        else
+          echo "Skipping Checkov (binary missing or no infrastructure/ directory)."
+        fi
 
     - name: Run Trivy
       shell: bash
@@ -77,18 +116,34 @@ runs:
     - name: Run upload script
       shell: bash
       env:
-        OUTLINE_API_KEY: ${{ inputs.api-key }}
-        OUTLINE_BASE_URL: ${{ inputs.base-url }}
+        OUTLINE_API_KEY:       ${{ inputs.api-key }}
+        OUTLINE_BASE_URL:      ${{ inputs.base-url }}
         OUTLINE_COLLECTION_ID: ${{ inputs.collection-id }}
-        REPORT_FILES: ${{ inputs.report-files }}
-        JOB_URL: ${{ inputs.job-url }}
-        PUBLISH_PATH: ${{ inputs.publish-path }}
-        PROJECT_NAME: ${{ inputs.project-name }}
+        REPORT_FILES:          ${{ inputs.report-files }}
+        JOB_URL:               ${{ inputs.job-url }}
+        PUBLISH_PATH:          ${{ inputs.publish-path }}
+        PROJECT_NAME:          ${{ inputs.project-name }}
+        SHORT_CODE:            ${{ inputs.short-code }}
+        COMPONENT:             ${{ inputs.component }}
+        RETENTION_COUNT:       ${{ inputs.retention-count }}
+        COMMIT_SHA:            ${{ inputs.commit-sha }}
+        DRY_RUN:               ${{ inputs.dry-run }}
       run: |
-        python ${{ github.action_path }}/upload.py \
-          --base-url "$OUTLINE_BASE_URL" \
-          --collection-id "$OUTLINE_COLLECTION_ID" \
-          --report-files "$REPORT_FILES" \
-          --job-url "$JOB_URL" \
-          --publish-path "$PUBLISH_PATH" \
-          --project-name "$PROJECT_NAME"
+        # Assemble the CLI invocation conditionally so empty optional inputs
+        # don't get serialised as `--foo ""` (argparse treats those as set).
+        # Required args always come first; optional args appear only when set.
+        ARGS=(
+          --base-url      "$OUTLINE_BASE_URL"
+          --collection-id "$OUTLINE_COLLECTION_ID"
+          --report-files  "$REPORT_FILES"
+        )
+        [ -n "$JOB_URL"         ] && ARGS+=( --job-url        "$JOB_URL" )
+        [ -n "$PUBLISH_PATH"    ] && ARGS+=( --publish-path   "$PUBLISH_PATH" )
+        [ -n "$PROJECT_NAME"    ] && ARGS+=( --project-name   "$PROJECT_NAME" )
+        [ -n "$SHORT_CODE"      ] && ARGS+=( --short-code     "$SHORT_CODE" )
+        [ -n "$COMPONENT"       ] && ARGS+=( --component      "$COMPONENT" )
+        [ -n "$RETENTION_COUNT" ] && ARGS+=( --retention-count "$RETENTION_COUNT" )
+        [ -n "$COMMIT_SHA"      ] && ARGS+=( --commit-sha     "$COMMIT_SHA" )
+        if [ "$DRY_RUN" = "true" ]; then ARGS+=( --dry-run ); fi
+
+        python ${{ github.action_path }}/upload.py "${ARGS[@]}"
